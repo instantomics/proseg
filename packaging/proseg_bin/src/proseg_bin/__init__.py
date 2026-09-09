@@ -15,11 +15,7 @@ def executable() -> Path:
 
 def subprocess_environment() -> dict[str, str]:
     environment = dict(os.environ)
-    library_path = str(_ROOT / "lib")
-    existing = environment.get("LD_LIBRARY_PATH")
-    environment["LD_LIBRARY_PATH"] = (
-        f"{library_path}{os.pathsep}{existing}" if existing else library_path
-    )
+    environment.pop("LD_LIBRARY_PATH", None)
     return environment
 
 

@@ -9,7 +9,7 @@ description = "Proseg 3.2.0 candidate for the Iomix segmentation task"
 requires-python = ">=3.13,<3.14"
 dependencies = [
   "numpy==2.5.1",
-  "proseg-bin @ https://github.com/instantomics/proseg/releases/download/proseg-bin-v3.2.0/proseg_bin-3.2.0-py3-none-manylinux_2_34_x86_64.whl",
+  "proseg-bin @ https://github.com/instantomics/proseg/releases/download/proseg-bin-v3.2.0.post1/proseg_bin-3.2.0.post1-py3-none-manylinux_2_34_x86_64.whl",
   "scipy==1.18.0",
   "shapely==2.1.2",
 ]

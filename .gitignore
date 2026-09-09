@@ -6,4 +6,3 @@ build/
 dist/
 *.egg-info/
 packaging/proseg_bin/src/proseg_bin/bin/
-packaging/proseg_bin/src/proseg_bin/lib/
