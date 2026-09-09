@@ -58,6 +58,7 @@ class ProsegConfig:
     samples: int = 10
     recorded_samples: int = 5
     hillclimb: int = 5
+    morphology_steps_per_iter: int = 250
     ncomponents: int = 10
     cell_compactness: float = 0.04
     burnin_voxel_size_um: float = 2.0
@@ -107,6 +108,7 @@ def _validate_config(config: ProsegConfig) -> None:
         "samples": (1, 10_000),
         "recorded_samples": (1, 10_000),
         "hillclimb": (0, 10_000),
+        "morphology_steps_per_iter": (1, 1_000_000),
         "ncomponents": (1, 1_024),
         "minimum_component_pixels": (1, 10_000_000),
         "maximum_initial_cells": (1, _MAX_INITIAL_CELLS),
@@ -524,6 +526,8 @@ def _build_command(
         str(config.recorded_samples),
         "--hillclimb",
         str(config.hillclimb),
+        "--morphology-steps-per-iter",
+        str(config.morphology_steps_per_iter),
         "--ncomponents",
         str(config.ncomponents),
         "--cell-compactness",
