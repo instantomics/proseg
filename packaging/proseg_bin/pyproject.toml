@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools==80.9.0", "wheel==0.45.1"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "proseg-bin"
+version = "3.2.0"
+description = "Pinned Proseg 3.2.0 Linux executable"
+requires-python = ">=3.9"
+license = "GPL-3.0-only"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+proseg_bin = ["bin/proseg", "lib/libgcc_s.so.1", "lib/libstdc++.so.6"]

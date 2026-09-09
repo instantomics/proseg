@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "iomix-proseg-segmentation-candidate"
+version = "3.2.0"
+description = "Proseg 3.2.0 candidate for the Iomix segmentation task"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+  "numpy==2.5.1",
+  "proseg-bin @ https://github.com/instantomics/proseg/releases/download/proseg-bin-v3.2.0/proseg_bin-3.2.0-py3-none-manylinux_2_34_x86_64.whl",
+  "scipy==1.18.0",
+  "shapely==2.1.2",
+]
+
+[project.optional-dependencies]
+cpu = []
+cu128 = []
+cu130 = []
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.uv]
+conflicts = [[{ extra = "cpu" }, { extra = "cu128" }, { extra = "cu130" }]]
