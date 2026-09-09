@@ -54,10 +54,10 @@ class ProsegExecutionError(RuntimeError):
 class ProsegConfig:
     nthreads: int = 4
     timeout_seconds: float = 540.0
-    burnin_samples: int = 200
-    samples: int = 200
-    recorded_samples: int = 100
-    hillclimb: int = 50
+    burnin_samples: int = 10
+    samples: int = 10
+    recorded_samples: int = 5
+    hillclimb: int = 5
     ncomponents: int = 10
     cell_compactness: float = 0.04
     burnin_voxel_size_um: float = 2.0

@@ -14,7 +14,7 @@ default_preset = "default"
 
 [[integrations.presets]]
 id = "default"
-parameters = { burnin_samples = 200, burnin_voxel_size_um = 2.0, cell_compactness = 0.04, hillclimb = 50, initial_assignment_radius_um = 12.0, maximum_density_bins = 262144, maximum_density_transcripts = 1500000, maximum_initial_cells = 4096, minimum_component_pixels = 12, ncomponents = 10, nthreads = 8, recorded_samples = 100, samples = 200, timeout_seconds = 540, transcript_bin_size_um = 4.0, transcript_density_quantile = 0.75, transcript_smoothing_um = 6.0, voxel_size_um = 1.0 }
+parameters = { burnin_samples = 10, burnin_voxel_size_um = 2.0, cell_compactness = 0.04, hillclimb = 5, initial_assignment_radius_um = 12.0, maximum_density_bins = 262144, maximum_density_transcripts = 1500000, maximum_initial_cells = 4096, minimum_component_pixels = 12, ncomponents = 10, nthreads = 8, recorded_samples = 5, samples = 10, timeout_seconds = 540, transcript_bin_size_um = 4.0, transcript_density_quantile = 0.75, transcript_smoothing_um = 6.0, voxel_size_um = 1.0 }
 
 [execution]
 entrypoint = "run_reference.py"

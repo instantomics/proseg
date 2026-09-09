@@ -27,3 +27,8 @@ initialization is a task-generic wrapper policy rather than an upstream-validate
 Proseg mode. The current integration assumes native transcript and image
 coordinates are micrometers. Proseg does not expose a random-seed option, so the
 initializer is deterministic but inference itself is stochastic.
+
+The maintained preset uses a deliberately short sampling schedule so all release
+fields fit the task phase budget. It is a speed-oriented reference configuration,
+not evidence that the sampler has converged; longer schedules may improve output
+at additional computational cost.
