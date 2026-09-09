@@ -21,7 +21,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "numpy", specifier = "==2.5.1" },
-    { name = "proseg-bin", url = "https://github.com/instantomics/proseg/releases/download/proseg-bin-v3.2.0/proseg_bin-3.2.0-py3-none-manylinux_2_34_x86_64.whl" },
+    { name = "proseg-bin", url = "https://github.com/instantomics/proseg/releases/download/proseg-bin-v3.2.0.post1/proseg_bin-3.2.0.post1-py3-none-manylinux_2_34_x86_64.whl" },
     { name = "scipy", specifier = "==1.18.0" },
     { name = "shapely", specifier = "==2.1.2" },
 ]
@@ -48,10 +48,10 @@ wheels = [
 
 [[package]]
 name = "proseg-bin"
-version = "3.2.0"
-source = { url = "https://github.com/instantomics/proseg/releases/download/proseg-bin-v3.2.0/proseg_bin-3.2.0-py3-none-manylinux_2_34_x86_64.whl" }
+version = "3.2.0.post1"
+source = { url = "https://github.com/instantomics/proseg/releases/download/proseg-bin-v3.2.0.post1/proseg_bin-3.2.0.post1-py3-none-manylinux_2_34_x86_64.whl" }
 wheels = [
-    { url = "https://github.com/instantomics/proseg/releases/download/proseg-bin-v3.2.0/proseg_bin-3.2.0-py3-none-manylinux_2_34_x86_64.whl", hash = "sha256:ab9140a59355081b339483ac34ca8a99a1caf589489ce09beedc104807b057eb" },
+    { url = "https://github.com/instantomics/proseg/releases/download/proseg-bin-v3.2.0.post1/proseg_bin-3.2.0.post1-py3-none-manylinux_2_34_x86_64.whl", hash = "sha256:45b22f87fbca52e87e1d5e915ec8a19472d093686b7c1c004904132e2f5431b3" },
 ]
 
 [[package]]
