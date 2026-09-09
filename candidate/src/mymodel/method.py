@@ -362,10 +362,10 @@ def _component_mask(
     selected = sorted(
         sorted(selected, key=lambda label: (-int(sizes[label]), label))[:maximum_components]
     )
-    result = np.zeros(values.shape, dtype=np.uint32)
+    remapping = np.zeros(count + 1, dtype=np.uint32)
     for new_label, old_label in enumerate(selected, start=1):
-        result[labels == old_label] = new_label
-    return result
+        remapping[old_label] = new_label
+    return remapping[labels]
 
 
 def _density_initial_cell_ids(
