@@ -10,20 +10,17 @@ import resource
 import subprocess
 import tempfile
 import time
-from collections import Counter
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 from scipy import ndimage
 from scipy.spatial import cKDTree
-from segmentation.geometry import assign_points
 from segmentation.schema import (
     MAX_POLYGON_VERTICES,
     PolygonInstance,
-    ReferenceExpression,
     SegmentationPrediction,
     TranscriptTable,
 )
@@ -223,12 +220,6 @@ def segment_field(field, config: ProsegConfig) -> SegmentationPrediction:
         child_rss_after = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
         cells = _load_geojson_cells(invocation.polygon_path, bounds)
         assignment_count = _count_assignments(invocation.transcript_metadata_path)
-
-    if field.information_condition == "labeled_reference":
-        reference = field.load_reference()
-        if reference is None or reference.cell_type_labels is None:
-            raise ValueError("labeled_reference field did not expose labeled reference data")
-        cells = _label_cells(transcripts, reference, cells)
 
     count = len(transcripts.transcript_ids)
     log_record: dict[str, Any] = {
@@ -790,59 +781,6 @@ def _count_assignments(path: Path) -> int | None:
             )
     except (OSError, UnicodeError, csv.Error):
         return None
-
-
-def _label_cells(
-    transcripts: TranscriptTable,
-    reference: ReferenceExpression,
-    cells: list[PolygonInstance],
-) -> list[PolygonInstance]:
-    labels = reference.cell_type_labels
-    if labels is None or not labels:
-        raise ValueError("labeled reference must contain cell type labels")
-    matched = reference.matched_expression(transcripts.gene_ids)
-    labels_array = np.asarray(labels)
-    label_order = tuple(sorted(set(labels)))
-    targets = np.vstack(
-        [
-            np.asarray(matched.counts[labels_array == label].mean(axis=0)).ravel()
-            for label in label_order
-        ]
-    )
-    targets = _normalize_profiles(targets)
-    spatial_lookup = {gene: index for index, gene in enumerate(transcripts.gene_ids)}
-    spatial_columns = np.asarray(
-        [spatial_lookup[gene] for gene in matched.gene_ids], dtype=np.int64
-    )
-    spatial_to_matched = np.full(len(transcripts.gene_ids), -1, dtype=np.int64)
-    spatial_to_matched[spatial_columns] = np.arange(len(spatial_columns))
-    assignments = assign_points(transcripts.coordinates, tuple(cells))
-    gene_index = np.asarray(transcripts.gene_index, dtype=np.int64)
-    frequencies = Counter(labels)
-    fallback = min(label_order, key=lambda label: (-frequencies[label], label))
-
-    labeled: list[PolygonInstance] = []
-    for cell in cells:
-        indices = np.flatnonzero(assignments == cell.instance_id)
-        mapped = spatial_to_matched[gene_index[indices]]
-        mapped = mapped[mapped >= 0]
-        if mapped.size and matched.gene_ids:
-            profile = np.bincount(mapped, minlength=len(matched.gene_ids))[None, :]
-            similarities = targets @ _normalize_profiles(profile)[0]
-            label = label_order[int(np.argmax(similarities))]
-        else:
-            label = fallback
-        labeled.append(replace(cell, cell_type_label=label))
-    return labeled
-
-
-def _normalize_profiles(matrix: np.ndarray) -> np.ndarray:
-    matrix = np.asarray(matrix, dtype=np.float64)
-    totals = matrix.sum(axis=1, keepdims=True)
-    normalized = np.divide(matrix, totals, out=np.zeros_like(matrix), where=totals > 0)
-    normalized = np.log1p(normalized * 10_000.0)
-    norms = np.linalg.norm(normalized, axis=1, keepdims=True)
-    return np.divide(normalized, norms, out=np.zeros_like(normalized), where=norms > 0)
 
 
 __all__ = ["load_config", "posterior_method", "segment_field"]

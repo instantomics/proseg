@@ -11,8 +11,7 @@ from types import ModuleType, SimpleNamespace
 
 import numpy as np
 import pytest
-from scipy import sparse
-from shapely.geometry import Point, Polygon
+from shapely.geometry import Polygon
 
 CANDIDATE_SOURCE = Path(__file__).parents[1] / "candidate" / "src"
 sys.path.insert(0, str(CANDIDATE_SOURCE))
@@ -23,7 +22,6 @@ class PolygonInstance:
     instance_id: str
     vertices: np.ndarray
     parent_cell_id: str | None = None
-    cell_type_label: str | None = None
 
 
 @dataclass(frozen=True)
@@ -49,50 +47,19 @@ class ImageChannel:
     pixel_size_um: tuple[float, float]
 
 
-@dataclass(frozen=True)
-class ReferenceExpression:
-    counts: sparse.csr_matrix
-    cell_ids: tuple[str, ...]
-    gene_ids: tuple[str, ...]
-    cell_type_labels: tuple[str, ...] | None = None
-
-    def matched_expression(self, gene_ids):
-        indices = [self.gene_ids.index(gene) for gene in gene_ids if gene in self.gene_ids]
-        return SimpleNamespace(
-            counts=self.counts[:, indices],
-            gene_ids=tuple(self.gene_ids[index] for index in indices),
-        )
-
-
-def _assign_points(coordinates, polygons):
-    result = np.full(len(coordinates), None, dtype=object)
-    for index, coordinate in enumerate(coordinates):
-        point = Point(coordinate)
-        for polygon in polygons:
-            if Polygon(polygon.vertices).covers(point):
-                result[index] = polygon.instance_id
-                break
-    return result
-
-
 segmentation = ModuleType("segmentation")
 segmentation.__path__ = []
-geometry = ModuleType("segmentation.geometry")
-geometry.assign_points = _assign_points
 schema = ModuleType("segmentation.schema")
 schema.MAX_POLYGON_VERTICES = 1_024
 for _name, _value in {
     "ImageChannel": ImageChannel,
     "PolygonInstance": PolygonInstance,
-    "ReferenceExpression": ReferenceExpression,
     "SegmentationPrediction": SegmentationPrediction,
     "TranscriptTable": TranscriptTable,
 }.items():
     setattr(schema, _name, _value)
-segmentation.geometry = geometry
 segmentation.schema = schema
 sys.modules["segmentation"] = segmentation
-sys.modules["segmentation.geometry"] = geometry
 sys.modules["segmentation.schema"] = schema
 
 from mymodel import method  # noqa: E402
@@ -269,26 +236,3 @@ def test_geojson_conversion_restores_origin_clips_simplifies_and_disjoins(
     assert all(100 <= x <= 110 and 200 <= y <= 210 for cell in cells for x, y in cell.vertices)
     assert polygons[0].intersection(polygons[1]).area == pytest.approx(0.0)
     assert not np.array_equal(cells[0].vertices[0], cells[0].vertices[-1])
-
-
-def test_labeled_reference_transfer_uses_only_legal_reference_labels() -> None:
-    transcripts = TranscriptTable(
-        ("t0", "t1", "t2", "t3"),
-        ("gene-a", "gene-b"),
-        np.asarray([0, 0, 1, 1], dtype=np.int64),
-        np.asarray([[1, 1], [2, 2], [11, 1], [12, 2]], dtype=np.float64),
-    )
-    reference = ReferenceExpression(
-        sparse.csr_matrix(np.asarray([[10, 0], [0, 10]], dtype=np.int64)),
-        ("reference-a", "reference-b"),
-        ("gene-a", "gene-b"),
-        ("type-a", "type-b"),
-    )
-    cells = [
-        PolygonInstance("cell-a", np.asarray([[0, 0], [5, 0], [5, 5], [0, 5]], dtype=float)),
-        PolygonInstance("cell-b", np.asarray([[10, 0], [15, 0], [15, 5], [10, 5]], dtype=float)),
-    ]
-
-    labeled = method._label_cells(transcripts, reference, cells)
-
-    assert [cell.cell_type_label for cell in labeled] == ["type-a", "type-b"]

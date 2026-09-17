@@ -12,8 +12,7 @@ image is available, the wrapper applies one fixed threshold-and-components
 initializer and supplies the resulting mask. Otherwise it initializes cells
 from fixed-scale, gene-agnostic transcript-density maxima. It never uses vendor
 cell assignments, evaluator truth, source comparator outputs, or expression
-references for segmentation. Labeled-reference scopes use the authorized
-reference only after segmentation to provide the labels required by the task.
+references for segmentation.
 
 The task accepts whole-cell polygons and derives transcript assignments from
 them. Proseg's own assignments are therefore counted in runtime diagnostics but
