@@ -9,7 +9,7 @@ draft = "candidate"
 
 [[integrations]]
 task_id = "segmentation"
-interface_id = "segmentation"
+interface_id = "segmentation.candidate:1"
 default_preset = "default"
 
 [[integrations.presets]]
