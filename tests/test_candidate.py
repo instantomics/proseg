@@ -130,7 +130,7 @@ def test_image_initialization_builds_generic_command_and_exact_local_affine(
         "nuclear",
         "nuclear",
         image,
-        (1_000_001.0, 2_000_002.0),
+        (999_999.5, 1_999_999.75),
         (0.5, 0.25),
     )
     field = SimpleNamespace(
@@ -151,8 +151,8 @@ def test_image_initialization_builds_generic_command_and_exact_local_affine(
     assert "--enforce-connectivity" in command
     assert _argument_values(command, "--voxel-layers") == ["1"]
     assert _argument_values(command, "--nthreads") == ["7"]
-    assert _argument_values(command, "--cellpose-x-transform", 3) == ["0.5", "0", "1"]
-    assert _argument_values(command, "--cellpose-y-transform", 3) == ["0", "0.25", "2"]
+    assert "--cellpose-x-transform=0.5 0 -0.5" in command
+    assert "--cellpose-y-transform=0 0.25 -0.25" in command
     mask_path = Path(_argument_values(command, "--cellpose-masks")[0])
     mask = np.load(mask_path, allow_pickle=False)
     assert mask.dtype == np.uint32

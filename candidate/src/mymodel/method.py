@@ -310,14 +310,10 @@ def _prepare_invocation(
         initialization_arguments = [
             "--cellpose-masks",
             str(mask_path),
-            "--cellpose-x-transform",
-            _float_argument(channel.pixel_size_um[0]),
-            "0",
-            _float_argument(x_offset),
-            "--cellpose-y-transform",
-            "0",
-            _float_argument(channel.pixel_size_um[1]),
-            _float_argument(y_offset),
+            "--cellpose-x-transform="
+            f"{_float_argument(channel.pixel_size_um[0])} 0 {_float_argument(x_offset)}",
+            "--cellpose-y-transform="
+            f"0 {_float_argument(channel.pixel_size_um[1])} {_float_argument(y_offset)}",
         ]
     else:
         local_bounds = (0.0, 0.0, bounds[2] - bounds[0], bounds[3] - bounds[1])
