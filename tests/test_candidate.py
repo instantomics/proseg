@@ -113,6 +113,10 @@ def _argument_values(command: tuple[str, ...], name: str, count: int = 1) -> lis
     return list(command[index + 1 : index + 1 + count])
 
 
+def test_float_argument_normalizes_signed_zero() -> None:
+    assert method._float_argument(-0.0) == "0"
+
+
 def test_image_initialization_builds_generic_command_and_exact_local_affine(
     tmp_path: Path,
 ) -> None:

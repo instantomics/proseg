@@ -554,6 +554,8 @@ def _float_argument(value: float) -> str:
     value = float(value)
     if not math.isfinite(value):
         raise ValueError("Proseg numeric arguments must be finite")
+    if value == 0:
+        return "0"
     return format(value, ".9g")
 
 
