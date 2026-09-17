@@ -295,8 +295,18 @@ def _prepare_invocation(
 
     if field.nuclear_image is not None:
         channel = field.load_nuclear_image()
+        x_scale, y_scale = (float(value) for value in channel.pixel_size_um)
+        if not math.isfinite(x_scale) or not math.isfinite(y_scale) or min(x_scale, y_scale) <= 0:
+            raise ValueError("nuclear-image pixel sizes must be positive and finite")
+        x_offset = float(channel.origin_um[0]) - bounds[0]
+        y_offset = float(channel.origin_um[1]) - bounds[1]
+        x_crop = max(0, math.ceil(-x_offset / x_scale))
+        y_crop = max(0, math.ceil(-y_offset / y_scale))
+        image = np.asarray(channel.image)
+        if image.ndim != 2 or x_crop >= image.shape[1] or y_crop >= image.shape[0]:
+            raise ValueError("nuclear image does not overlap the field-local coordinate system")
         mask = _component_mask(
-            channel.image,
+            image[y_crop:, x_crop:],
             minimum_component_pixels=config.minimum_component_pixels,
             maximum_components=config.maximum_initial_cells,
         )
@@ -305,15 +315,19 @@ def _prepare_invocation(
         mask_path = workdir / "nuclear-components.npy"
         np.save(mask_path, mask, allow_pickle=False)
         initial_cell_ids = np.zeros(len(local_coordinates), dtype=np.uint32)
-        x_offset = float(channel.origin_um[0]) - bounds[0]
-        y_offset = float(channel.origin_um[1]) - bounds[1]
+        x_offset += x_crop * x_scale
+        y_offset += y_crop * y_scale
         initialization_arguments = [
             "--cellpose-masks",
             str(mask_path),
-            "--cellpose-x-transform="
-            f"{_float_argument(channel.pixel_size_um[0])} 0 {_float_argument(x_offset)}",
-            "--cellpose-y-transform="
-            f"0 {_float_argument(channel.pixel_size_um[1])} {_float_argument(y_offset)}",
+            "--cellpose-x-transform",
+            _float_argument(x_scale),
+            "0",
+            _float_argument(x_offset),
+            "--cellpose-y-transform",
+            "0",
+            _float_argument(y_scale),
+            _float_argument(y_offset),
         ]
     else:
         local_bounds = (0.0, 0.0, bounds[2] - bounds[0], bounds[3] - bounds[1])
