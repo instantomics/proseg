@@ -11,6 +11,7 @@ from types import ModuleType, SimpleNamespace
 
 import numpy as np
 import pytest
+from scipy import sparse
 from shapely.geometry import Polygon
 
 CANDIDATE_SOURCE = Path(__file__).parents[1] / "candidate" / "src"
@@ -22,6 +23,7 @@ class PolygonInstance:
     instance_id: str
     vertices: np.ndarray
     parent_cell_id: str | None = None
+    type_probabilities: dict[str, float] | None = None
 
 
 @dataclass(frozen=True)
@@ -63,6 +65,7 @@ sys.modules["segmentation"] = segmentation
 sys.modules["segmentation.schema"] = schema
 
 from mymodel import method  # noqa: E402
+from mymodel.typing import assigned_counts, type_probabilities  # noqa: E402
 
 
 def _transcripts(coordinates: np.ndarray) -> TranscriptTable:
@@ -236,3 +239,159 @@ def test_geojson_conversion_restores_origin_clips_simplifies_and_disjoins(
     assert all(100 <= x <= 110 and 200 <= y <= 210 for cell in cells for x, y in cell.vertices)
     assert polygons[0].intersection(polygons[1]).area == pytest.approx(0.0)
     assert not np.array_equal(cells[0].vertices[0], cells[0].vertices[-1])
+
+
+def _reference(counts, labels, genes=("gene,quoted", "gene-b")):
+    """Stand-in for the task's already-matched reference expression view."""
+    matrix = sparse.csr_matrix(counts)
+
+    def matched_expression(spatial_genes):
+        shared = tuple(gene for gene in genes if gene in spatial_genes)
+        return SimpleNamespace(
+            counts=matrix[:, [genes.index(gene) for gene in shared]], gene_ids=shared
+        )
+
+    return SimpleNamespace(cell_type_labels=tuple(labels), matched_expression=matched_expression)
+
+
+def test_typing_retains_sparse_uncertainty_and_normalizes_reference_cells_equally():
+    reference = _reference([[90, 10], [9000, 1000], [1, 9]], ["A", "A", "B"])
+    counts = sparse.csr_matrix([[0, 0], [1, 0], [20, 0], [0, 20], [10**8, 0]])
+    result = type_probabilities(counts, ("gene,quoted", "gene-b"), reference)
+
+    assert result[0] == {"A": 0.5, "B": 0.5}
+    # One RNA has probability proportional to the smoothed mean proportions,
+    # rather than to library depth or the number of reference cells of a type.
+    assert result[1]["A"] == pytest.approx((23 / 30) / (23 / 30 + 3 / 10))
+    assert 0.5 < result[1]["A"] < result[2]["A"] < 1
+    assert result[3]["B"] > 0.95
+    assert result[4]["A"] > 0.99
+    for probability in result:
+        assert sum(probability.values()) == pytest.approx(1, abs=1e-8)
+        assert all(np.isfinite(value) and 0 <= value <= 1 for value in probability.values())
+
+
+@pytest.mark.parametrize(
+    "reference",
+    [
+        _reference([[1], [3]], ["A", "B"], ("unshared",)),
+        _reference([[1, 0], [3, 0]], ["A", "B"]),
+        _reference([[1, 3], [0, 0]], ["A", "B"]),
+        _reference([[1, 3], [1, 3]], ["A", "B"]),
+    ],
+)
+def test_uninformative_panel_does_not_assert_unknown_or_drop_a_visible_type(reference):
+    result = type_probabilities(
+        sparse.csr_matrix([[50, 0], [0, 50], [0, 0]]), ("gene,quoted", "gene-b"), reference
+    )
+    assert result == [{"A": 0.5, "B": 0.5}] * 3
+
+
+def test_typing_aligns_gene_axes_and_ignores_unmatched_transcripts():
+    reference = _reference([[9, 1], [1, 9]], ["A", "B"])
+    expected = type_probabilities(
+        sparse.csr_matrix([[7, 1], [0, 0]]), ("gene,quoted", "gene-b"), reference
+    )
+    reordered = type_probabilities(
+        sparse.csr_matrix([[1, 1_000_000, 7], [0, 1_000_000, 0]]),
+        ("gene-b", "unshared", "gene,quoted"),
+        reference,
+    )
+    assert reordered == expected
+
+
+def _write_assignments(path, rows):
+    with gzip.open(path, "wt", encoding="utf-8", newline="") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(("transcript_id", "gene", "assignment", "background"))
+        writer.writerows(rows)
+
+
+@pytest.mark.parametrize("defect", ["duplicate", "missing", "wrong_gene", "out_of_range"])
+def test_assignment_join_rejects_silent_identity_corruption(tmp_path, defect):
+    transcripts = _transcripts(np.zeros((2, 2)))
+    rows = [[0, "gene,quoted", 0, "false"], [1, "gene-b", 0, "false"]]
+    if defect == "duplicate":
+        rows.append(rows[0])
+    elif defect == "missing":
+        rows.pop()
+    elif defect == "wrong_gene":
+        rows[0][1] = "gene-b"
+    else:
+        rows[0][0] = 2
+    path = tmp_path / "assignments.csv.gz"
+    _write_assignments(path, rows)
+    with pytest.raises(ValueError, match="Proseg transcript"):
+        assigned_counts(path, transcripts, [])
+
+
+def test_segment_field_types_proseg_assignments_without_changing_geometry(tmp_path, monkeypatch):
+    transcripts = _transcripts(np.full((12, 2), 0.5))
+    reference = _reference([[90, 10], [10, 90]], ["A", "B"])
+    field = SimpleNamespace(
+        field_handle="test-field",
+        field_bounds=(0.0, 0.0, 10.0, 10.0),
+        nuclear_image=None,
+        load_transcripts=lambda: transcripts,
+        load_reference=lambda: reference,
+    )
+
+    def run(command, **kwargs):
+        # Unsorted IDs and an out-of-field polygon exercise identity preservation
+        # through sorting and dropping. Cell zero is a real Proseg output cell.
+        features = []
+        for cell_id, x in [(7, 3), (1, 20), (0, 0), (9, 6)]:
+            features.append(
+                {
+                    "type": "Feature",
+                    "properties": {"cell": cell_id},
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[[x, 0], [x + 1, 0], [x + 1, 1], [x, 1], [x, 0]]],
+                    },
+                }
+            )
+        polygon_path = Path(_argument_values(command, "--output-cell-polygons")[0])
+        with gzip.open(polygon_path, "wt", encoding="utf-8") as handle:
+            json.dump({"type": "FeatureCollection", "features": features}, handle)
+        path = Path(_argument_values(command, "--output-transcript-metadata")[0])
+        # All coordinates are in cell 0, but Proseg owns the expression partition.
+        rows = [
+            [index, transcripts.gene_ids[index % 2], 0 if index % 2 == 0 else 7, "false"]
+            for index in range(8)
+        ]
+        rows.extend(
+            [
+                [8, "gene,quoted", 7, "true"],  # Ambient RNA even though assigned.
+                [9, "gene-b", "", "true"],
+                [10, "gene,quoted", 1, "false"],  # Discarded polygon.
+                [11, "gene-b", 0, "true"],
+            ]
+        )
+        _write_assignments(path, list(reversed(rows)))
+
+    monkeypatch.setattr(method, "_proseg_runtime", lambda: (Path("/opt/proseg"), {}))
+    monkeypatch.setattr(method, "_local_scratch_root", lambda: str(tmp_path))
+    monkeypatch.setattr(method, "_run_command", run)
+    prediction = method.segment_field(field, method.ProsegConfig())
+
+    assert [cell.instance_id for cell in prediction.cells] == [
+        "proseg-cell-0",
+        "proseg-cell-7",
+        "proseg-cell-9",
+    ]
+    expected = type_probabilities(
+        sparse.csr_matrix([[4, 0], [0, 4], [0, 0]]), transcripts.gene_ids, reference
+    )
+    assert [cell.type_probabilities for cell in prediction.cells] == expected
+    assert expected[0]["A"] > 0.9
+    assert expected[1]["B"] > 0.9
+    assert expected[2] == {"A": 0.5, "B": 0.5}
+    assert prediction.nuclei == ()
+
+    field.load_reference = lambda: None
+    untyped = method.segment_field(field, method.ProsegConfig())
+    for typed_cell, plain_cell in zip(prediction.cells, untyped.cells, strict=True):
+        assert typed_cell.instance_id == plain_cell.instance_id
+        np.testing.assert_array_equal(typed_cell.vertices, plain_cell.vertices)
+        assert plain_cell.type_probabilities is None

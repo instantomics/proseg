@@ -11,7 +11,7 @@ import subprocess
 import tempfile
 import time
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +28,8 @@ from shapely import STRtree, make_valid
 from shapely.affinity import translate
 from shapely.errors import GEOSException
 from shapely.geometry import GeometryCollection, MultiPolygon, Polygon, box, shape
+
+from .typing import assigned_counts, type_probabilities
 
 LOGGER = logging.getLogger(__name__)
 
@@ -219,7 +221,16 @@ def segment_field(field, config: ProsegConfig) -> SegmentationPrediction:
         inference_seconds = time.monotonic() - started
         child_rss_after = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
         cells = _load_geojson_cells(invocation.polygon_path, bounds)
-        assignment_count = _count_assignments(invocation.transcript_metadata_path)
+        counts, assignment_count = assigned_counts(
+            invocation.transcript_metadata_path, transcripts, cells
+        )
+        reference = field.load_reference()
+        if reference is not None and reference.cell_type_labels is not None:
+            probabilities = type_probabilities(counts, transcripts.gene_ids, reference)
+            cells = [
+                replace(cell, type_probabilities=probability)
+                for cell, probability in zip(cells, probabilities, strict=True)
+            ]
 
     count = len(transcripts.transcript_ids)
     log_record: dict[str, Any] = {
@@ -608,25 +619,24 @@ def _load_geojson_cells(
     if not isinstance(features, list):
         raise TypeError("Proseg GeoJSON features must be an array")
 
-    ordered: list[tuple[tuple[int, Any, int], Mapping[str, Any]]] = []
-    for index, feature in enumerate(features):
+    ordered: list[tuple[int, Mapping[str, Any]]] = []
+    seen: set[int] = set()
+    for feature in features:
         if not isinstance(feature, Mapping):
             continue
         properties = feature.get("properties")
-        cell = properties.get("cell") if isinstance(properties, Mapping) else index
-        if isinstance(cell, int) and not isinstance(cell, bool):
-            key = (0, cell, index)
-        elif isinstance(cell, str) and cell.isdecimal():
-            key = (0, int(cell), index)
-        else:
-            key = (1, str(cell), index)
-        ordered.append((key, feature))
+        cell = properties.get("cell") if isinstance(properties, Mapping) else None
+        if isinstance(cell, bool) or not isinstance(cell, int) or cell < 0 or cell in seen:
+            raise ValueError("Proseg polygons require unique nonnegative integer cell IDs")
+        seen.add(cell)
+        ordered.append((cell, feature))
     ordered.sort(key=lambda item: item[0])
 
     field_box = box(*bounds)
     origin_x, origin_y = bounds[:2]
     prepared: list[Polygon] = []
-    for _key, feature in ordered:
+    prepared_ids: list[int] = []
+    for cell_id, feature in ordered:
         geometry_value = feature.get("geometry")
         if not isinstance(geometry_value, Mapping):
             continue
@@ -644,6 +654,7 @@ def _load_geojson_cells(
         if polygon is None:
             continue
         prepared.append(polygon)
+        prepared_ids.append(cell_id)
 
     tree = STRtree(prepared)
     resolved: list[Polygon | None] = [None] * len(prepared)
@@ -670,7 +681,7 @@ def _load_geojson_cells(
         if len(vertices) < 3 or not np.isfinite(vertices).all():
             continue
         resolved[index] = polygon
-        result.append(PolygonInstance(f"proseg-cell-{len(result)}", vertices))
+        result.append(PolygonInstance(f"proseg-cell-{prepared_ids[index]}", vertices))
     return result
 
 
@@ -766,21 +777,6 @@ def _simplify_to_limit(polygon: Polygon, maximum_vertices: int) -> Polygon | Non
         else:
             low = middle
     return candidate
-
-
-def _count_assignments(path: Path) -> int | None:
-    try:
-        with gzip.open(path, "rt", encoding="utf-8", newline="") as handle:
-            reader = csv.DictReader(handle)
-            if not reader.fieldnames or "assignment" not in reader.fieldnames:
-                return None
-            return sum(
-                bool((row.get("assignment") or "").strip())
-                and (row.get("background") or "false").strip().lower() not in {"true", "1"}
-                for row in reader
-            )
-    except (OSError, UnicodeError, csv.Error):
-        return None
 
 
 __all__ = ["load_config", "posterior_method", "segment_field"]
