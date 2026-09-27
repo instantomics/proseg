@@ -304,7 +304,7 @@ def _prepare_invocation(
         y_offset = float(channel.origin_um[1]) - bounds[1]
         x_crop = max(0, math.ceil(-x_offset / x_scale))
         y_crop = max(0, math.ceil(-y_offset / y_scale))
-        image = np.asarray(channel.image)
+        image = _middle_plane(channel.image)
         if image.ndim != 2 or x_crop >= image.shape[1] or y_crop >= image.shape[0]:
             raise ValueError("nuclear image does not overlap the field-local coordinate system")
         mask = _component_mask(
@@ -349,6 +349,11 @@ def _prepare_invocation(
         initialization_arguments,
     )
     return ProsegInvocation(command, polygon_path, metadata_path, log_path)
+
+
+def _middle_plane(values: np.ndarray) -> np.ndarray:
+    image = np.asarray(values)
+    return image[image.shape[0] // 2] if image.ndim == 3 else image
 
 
 def _component_mask(

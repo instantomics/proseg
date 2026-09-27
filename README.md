@@ -9,7 +9,8 @@ task contract.
 
 Proseg requires an initial cell count and approximate locations. When a nuclear
 image is available, the wrapper applies one fixed threshold-and-components
-initializer and supplies the resulting mask. Otherwise it initializes cells
+initializer to its middle plane and supplies the resulting mask. Otherwise it
+initializes cells
 from fixed-scale, gene-agnostic transcript-density maxima. It never uses vendor
 cell assignments, evaluator truth, source comparator outputs, or expression
 references for segmentation.

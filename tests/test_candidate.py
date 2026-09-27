@@ -94,8 +94,9 @@ def test_image_initialization_builds_generic_command_and_exact_local_affine(
     transcripts = _transcripts(
         np.asarray([[1_000_002.25, 2_000_003.5], [1_000_004.0, 2_000_005.0]])
     )
-    image = np.zeros((9, 9), dtype=np.float32)
-    image[2:7, 2:7] = 10
+    middle = np.zeros((9, 9), dtype=np.float32)
+    middle[2:7, 2:7] = 10
+    image = np.stack([np.zeros_like(middle), middle, np.zeros_like(middle)])
     channel = ImageChannel(
         "nuclear",
         "nuclear",
