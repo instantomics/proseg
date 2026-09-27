@@ -19,7 +19,7 @@ parameters = { burnin_samples = 10, burnin_voxel_size_um = 2.0, cell_compactness
 [execution]
 entrypoint = "run_reference.py"
 api_version = 1
-allowed_tools = ["freeze_candidate", "validate_model", "start_evaluation", "wait_job", "inspect_job"]
+allowed_tools = ["freeze_candidate", "validate_model", "evaluate", "wait_job", "inspect_job"]
 max_tool_calls = 9
 timeout_seconds = 2400
 network_access = "none"

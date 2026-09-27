@@ -12,7 +12,7 @@ def run(tools, context):
         raise RuntimeError(f"candidate validation failed: {validation!r}")
 
     evaluation = tools.call(
-        "start_evaluation",
+        "evaluate",
         {"candidate_label": candidate_label, "profile_id": "validation"},
     )
     job_id = evaluation["job_id"]

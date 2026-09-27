@@ -30,7 +30,7 @@ class FakeTools:
             return {"ok": True}
         if name == "validate_model":
             return {"valid": True}
-        if name == "start_evaluation":
+        if name == "evaluate":
             return {"job_id": "job-1", "status": "queued"}
         if name == "wait_job":
             return {"job_id": "job-1", "status": next(self.wait_statuses)}
@@ -48,7 +48,7 @@ def test_entrypoint_uses_the_ordinary_candidate_lifecycle() -> None:
     assert [name for name, _ in tools.calls] == [
         "freeze_candidate",
         "validate_model",
-        "start_evaluation",
+        "evaluate",
         "wait_job",
         "wait_job",
         "inspect_job",
